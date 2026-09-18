@@ -1063,7 +1063,7 @@
                                     <div class="text-[10px] font-bold text-rose-300/70 mb-1"><i class="fa-solid fa-lock text-rose-400 mr-1"></i> पासवर्ड</div>
                                     <div style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,0,85,0.3); border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;">
                                         <span id="successPassword" style="font-size: 14px; font-weight: 700; color: #2dd4bf; font-family: monospace;">XXXXXXXXXX</span>
-                                        <span class="text-[9px] text-rose-300/60 bg-rose-500/10 px-2.5 py-0.5 rounded-full">(मोबाइल)</span>
+                                        <button onclick="copyToClipboard('successPassword', '✅ पासवर्ड कॉपी!')" class="copy-btn"><i class="fa-solid fa-copy"></i> कॉपी</button>
                                     </div>
                                 </div>
                             </div>
@@ -2028,7 +2028,6 @@
                 coinxWalletSC: doc.coinxWalletSC || '',
                 profilePhoto: doc.profilePhoto || '',
                 totalPurchased: parseFloat(doc.totalPurchased || 0),
-                // ⚡ NEW: Server-side stored daily reward timestamp
                 lastDailyClaim: parseInt(doc.lastDailyClaim || 0, 10)
             };
         }
@@ -2088,7 +2087,6 @@
             return str.slice(0, show) + '****' + str.slice(-show);
         }
 
-        // ⚡ REFERRAL URL HELPER
         function getReferralBaseUrl() {
             let baseUrl = localStorage.getItem('suprix_referral_base_url');
             if (!baseUrl) {
@@ -2223,7 +2221,6 @@
             }
         }
 
-        // ⚡ NEW: Welcome voice message with the requested format
         function speakWelcomeMessage(userName) {
             if (!voiceEnabled) return;
             const name = (userName || 'यूज़र').trim();
@@ -2319,12 +2316,10 @@
         }
         function closeAppDownloadPopup() { document.getElementById('appDownloadPopup').classList.add('hidden'); }
 
-        // ⚡ UPDATED: Direct download from Google Drive with new file ID
         function downloadApkDirect(event) {
             if (event) event.preventDefault();
             const apkUrl = `https://drive.google.com/uc?export=download&id=${APK_DRIVE_ID}`;
             const apkUrlAlt = `https://drive.usercontent.google.com/download?id=${APK_DRIVE_ID}&export=download&confirm=t`;
-            // Open direct download in new tab — browser will download APK
             const link = document.createElement('a');
             link.href = apkUrl;
             link.download = 'SupriX_Global.apk';
@@ -2334,7 +2329,6 @@
             link.click();
             setTimeout(() => {
                 document.body.removeChild(link);
-                // Fallback if browser blocked
                 if (!document.hidden) {
                     window.open(apkUrlAlt, '_blank');
                 }
@@ -3137,7 +3131,6 @@
                 if (pageId === 'registrationPage') speakHindi('SupriX Global में आपका स्वागत है। कृपया अपना डिटेल्स भरे और रजिस्ट्रेशन करें।');
                 else if (pageId === 'loginPage') speakHindi('कृपया लॉगिन करें। अपनी ईमेल या SPX ID और पासवर्ड दर्ज करें।');
                 else if (pageId === 'dashboardPage' && currentUser && !welcomeVoicePlayed) {
-                    // ⚡ NEW: Speak the requested welcome message with user's name
                     speakWelcomeMessage(currentUser.name);
                     welcomeVoicePlayed = true;
                 }
@@ -3148,7 +3141,7 @@
         }
 
         // ============================================================
-        // COOLDOWN — uses SERVER-SIDE timestamp (currentUser.lastDailyClaim)
+        // COOLDOWN
         // ============================================================
         function startCooldownTimer() {
             stopCooldownTimer();
@@ -3161,7 +3154,6 @@
             if (!currentUser) return;
             const now = Date.now();
             const oneDayMs = 24 * 60 * 60 * 1000;
-            // ⚡ SERVER-SIDE: Reads from currentUser (loaded from DB)
             const lastClaimed = parseInt(currentUser.lastDailyClaim || 0, 10);
             const staked = parseFloat(currentUser.staked || 0);
             const timerText = document.getElementById('miningTimerText');
@@ -3300,13 +3292,11 @@
                     }, 1500);
                 }
 
-                // Reset welcome voice flag for fresh login
                 welcomeVoicePlayed = false;
 
                 showLoginPopup();
                 showToast('✅ लॉगिन सफल!', 'success');
 
-                // showPage will trigger the welcome voice with user's name
                 showPage('dashboardPage');
                 startCooldownTimer();
             } catch (e) {
@@ -3337,55 +3327,91 @@
             const email = document.getElementById('regEmail').value.trim();
             const phone = document.getElementById('regPhone').value.trim();
             const referral = document.getElementById('regReferral').value.trim();
-            if (!name || !email || !phone) { showToast('सभी आवश्यक फील्ड्स भरें।', 'error'); return; }
-            if (phone.length < 8) { showToast('मोबाइल कम से कम 8 अंक', 'error'); return; }
+            
+            if (!name || !email || !phone) { 
+                showToast('सभी आवश्यक फील्ड्स भरें।', 'error'); 
+                return; 
+            }
+            if (phone.length < 8) { 
+                showToast('मोबाइल कम से कम 8 अंक', 'error'); 
+                return; 
+            }
+
             setButtonLoading(btn, true);
             document.getElementById('loadingOverlay').classList.add('show');
+
             try {
+                // 1. चेक करें कि क्या यूजर डेटाबेस में पहले से है
                 const existing = await databases.listDocuments(DATABASE_ID, USERS_COLLECTION_ID, [Query.equal('email', email)]);
                 if (existing.documents.length > 0) {
-                    showToast('ईमेल पहले से रजिस्टर्ड!', 'error');
+                    showToast('यह ईमेल पहले से रजिस्टर्ड है! कृपया लॉगिन करें।', 'error');
                     document.getElementById('loadingOverlay').classList.remove('show');
                     setButtonLoading(btn, false);
                     return;
                 }
-                let newAccount;
+
+                let newAccount = null;
+                let coinxId = null;
+
+                // 2. नया अकाउंट बनाने की कोशिश करें
                 try {
                     newAccount = await account.create(ID.unique(), email, phone, name);
                 } catch (authErr) {
+                    // अगर ईमेल पहले से Appwrite Auth में है
                     if (authErr.message && authErr.message.includes('already exists')) {
-                        showToast('Auth में पहले से मौजूद!', 'error');
-                        document.getElementById('loadingOverlay').classList.remove('show');
-                        setButtonLoading(btn, false);
-                        return;
+                        try {
+                            // पुराने अकाउंट में लॉगिन करने की कोशिश करें (पासवर्ड = मोबाइल नंबर)
+                            await account.createEmailPasswordSession(email, phone);
+                            newAccount = await account.get();
+                        } catch (loginErr) {
+                            showToast('❌ यह ईमेल पहले से रजिस्टर्ड है। कृपया सही पासवर्ड (मोबाइल नंबर) दर्ज करें या लॉगिन करें।', 'error');
+                            document.getElementById('loadingOverlay').classList.remove('show');
+                            setButtonLoading(btn, false);
+                            return;
+                        }
+                    } else {
+                        throw authErr; // अगर कोई और एरर है तो आगे बढ़ें
                     }
-                    throw authErr;
                 }
-                try { await account.deleteSession('current'); } catch (e) {}
-                await account.createEmailPasswordSession(email, phone);
-                const coinxId = generateCoinXId();
-                const userData = {
-                    name, email, phone,
-                    coins: 0, staked: 0, withdrawal: 0,
-                    staking: JSON.stringify([]), stakingHistory: JSON.stringify([]),
-                    pending_deposit: '', approved_deposit: JSON.stringify([]),
-                    pending_withdrawal: '', approved_withdrawal: JSON.stringify([]),
-                    withdrawal_address: '', withdrawal_screenshot: '',
-                    referrals: JSON.stringify([]), transactions: JSON.stringify([]),
-                    tradeHistory: JSON.stringify([]), buySellWallet: 0, tradeWallet: 0,
-                    coinxId, referredBy: referral || null, isBlocked: false,
-                    coinxWalletSC: '', profilePhoto: '', totalPurchased: 0,
-                    lastDailyClaim: 0
-                };
-                await databases.createDocument(DATABASE_ID, USERS_COLLECTION_ID, newAccount.$id, userData);
+
+                // 3. यूजर डॉक्यूमेंट चेक करें या बनाएं
+                let userDoc = null;
+                try {
+                    const result = await databases.listDocuments(DATABASE_ID, USERS_COLLECTION_ID, [Query.equal('email', email)]);
+                    if (result.documents.length > 0) userDoc = result.documents[0];
+                } catch (e) {}
+
+                if (!userDoc) {
+                    // नया यूजर डॉक्यूमेंट बनाएं
+                    coinxId = generateCoinXId();
+                    const userData = {
+                        name, email, phone,
+                        coins: 0, staked: 0, withdrawal: 0,
+                        staking: JSON.stringify([]), stakingHistory: JSON.stringify([]),
+                        pending_deposit: '', approved_deposit: JSON.stringify([]),
+                        pending_withdrawal: '', approved_withdrawal: JSON.stringify([]),
+                        withdrawal_address: '', withdrawal_screenshot: '',
+                        referrals: JSON.stringify([]), transactions: JSON.stringify([]),
+                        tradeHistory: JSON.stringify([]), buySellWallet: 0, tradeWallet: 0,
+                        coinxId, referredBy: referral || null, isBlocked: false,
+                        coinxWalletSC: '', profilePhoto: '', totalPurchased: 0,
+                        lastDailyClaim: 0
+                    };
+                    await databases.createDocument(DATABASE_ID, USERS_COLLECTION_ID, newAccount.$id, userData);
+                } else {
+                    coinxId = userDoc.coinxId;
+                }
+
                 if (referral) localStorage.setItem('cx_pending_referral_code', referral);
 
+                // 4. सक्सेस पेज पर डिटेल्स दिखाएं
                 document.getElementById('successUserId').innerText = email;
                 document.getElementById('successSpxId').innerText = coinxId;
                 document.getElementById('successPassword').innerText = phone;
 
                 showPage('regSuccessPage');
                 setTimeout(() => { launchConfetti(70); }, 300);
+
                 if (voiceEnabled) {
                     setTimeout(() => {
                         speakHindi(`बधाई हो ${name}! आपका रजिस्ट्रेशन सफलतापूर्वक पूर्ण हुआ।`);
@@ -3393,6 +3419,7 @@
                     }, 600);
                 }
                 showToast('🎉 रजिस्ट्रेशन सफल!', 'success');
+
             } catch (e) {
                 console.error('Registration error:', e);
                 showToast('❌ ' + (e.message || 'त्रुटि'), 'error');
@@ -3544,7 +3571,7 @@
         }
 
         // ============================================================
-        // MINING — 24-Hour Server-Side Reward Check
+        // MINING
         // ============================================================
         async function triggerMiningReward(btn) {
             if (!currentUser) { showToast('कृपया लॉगिन करें।', 'error'); return; }
@@ -3557,7 +3584,6 @@
                 return;
             }
 
-            // ⚡ SERVER-SIDE 24h check (works across devices)
             const now = Date.now();
             const oneDayMs = 24 * 60 * 60 * 1000;
             const lastClaimed = parseInt(currentUser.lastDailyClaim || 0, 10);
@@ -3583,7 +3609,6 @@
                 const txs = [...(currentUser.transactions || [])];
                 txs.push({ type: 'daily_reward', coinsAmount: reward, dateTime: new Date().toLocaleString('hi-IN'), status: 'SUCCESS', receiptId: receiptId, network: 'USDT BEP20' });
 
-                // ⚡ SAVE TO DB FIRST (with new lastDailyClaim) — ensures no duplicate reward across devices
                 const docId = currentUser.docId || currentUser.$id;
                 if (!docId) throw new Error('User ID not found');
 
@@ -3593,7 +3618,6 @@
                     lastDailyClaim: now
                 });
 
-                // Update local state AFTER successful DB write
                 currentUser.coins = newCoins;
                 currentUser.transactions = txs;
                 currentUser.lastDailyClaim = now;
@@ -4375,7 +4399,6 @@
                             localStorage.removeItem('cx_pending_level_' + currentUser.$id);
                         }, 1500);
                     }
-                    // ⚡ Reset welcomeVoicePlayed so welcome voice plays on auto-login
                     welcomeVoicePlayed = false;
                     showPage('dashboardPage');
                     startCooldownTimer();
